@@ -1,4 +1,4 @@
-name: build-mac
+name: build-all
 
 on:
   workflow_dispatch:
@@ -6,8 +6,13 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build-mac:
+  mac-build:
+    name: mac (${{ matrix.arch }})
     runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x86_64]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,15 +29,46 @@ jobs:
 
       - name: Build app
         run: |
-          pyinstaller --windowed --name "9retboards" 9retboards.py
+          pyinstaller --windowed --name "9retboards" --target-arch ${{ matrix.arch }} 9retboards.py
 
       - name: Zip app
         run: |
           cd dist
-          ditto -c -k --sequesterRsrc --keepParent "9retboards.app" "9retboards-mac.zip"
+          ditto -c -k --sequesterRsrc --keepParent "9retboards.app" "9retboards-mac-${{ matrix.arch }}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: 9retboards-mac
-          path: dist/9retboards-mac.zip
+          name: 9retboards-mac-${{ matrix.arch }}
+          path: dist/9retboards-mac-${{ matrix.arch }}.zip
+
+  windows-build:
+    name: windows (x64)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller
+
+      - name: Build exe
+        run: |
+          pyinstaller --noconsole --onefile --name "9retboards" 9retboards.py
+
+      - name: Zip exe
+        run: |
+          powershell -Command "Compress-Archive -Path dist\9retboards.exe -DestinationPath dist\9retboards-windows-x64.zip -Force"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 9retboards-windows-x64
+          path: dist/9retboards-windows-x64.zip
